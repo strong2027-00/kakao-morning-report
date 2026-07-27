@@ -1,0 +1,42 @@
+name: Morning KakaoTalk Report
+
+on:
+  schedule:
+    # UTC 22:00 = 한국시간(KST) 07:00
+    - cron: "0 22 * * *"
+  workflow_dispatch: {} # Actions 탭에서 수동으로도 실행해볼 수 있게
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 파이썬 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      # 이전 실행에서 저장해둔 state.json / refresh_token을 불러옴
+      # (git에는 올라가지 않고, GitHub Actions 캐시에만 저장돼요)
+      - name: 이전 상태 복원
+        uses: actions/cache@v4
+        with:
+          path: |
+            state.json
+            kakao_refresh_token.txt
+          key: kakao-morning-state-${{ github.run_id }}
+          restore-keys: |
+            kakao-morning-state-
+
+      - name: 리포트 생성 및 카카오톡 전송
+        env:
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
+          HOLDINGS_JSON: ${{ secrets.HOLDINGS_JSON }}
+          WATCHLIST_JSON: ${{ secrets.WATCHLIST_JSON }}
+        run: python morning_report.py
