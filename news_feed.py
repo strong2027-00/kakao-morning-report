@@ -12,6 +12,8 @@ import urllib.parse
 import feedparser
 import yfinance as yf
 
+import translate_news
+
 # 종목별 뉴스가 부족할 때 구글 뉴스 검색으로 대체하기 위한 검색어 매핑
 TICKER_SEARCH_NAMES = {
     "BTC-USD": "비트코인",
@@ -44,8 +46,9 @@ def _parse_feed(url, limit):
 
 
 def fetch_crypto_news(rss_url, limit=3):
-    """CoinDesk 등 크립토 전문 매체 RSS에서 최신 헤드라인 가져오기"""
-    return _parse_feed(rss_url, limit)
+    """CoinDesk 등 크립토 전문 매체 RSS에서 최신 헤드라인 가져오기 (영어면 번역)"""
+    items = _parse_feed(rss_url, limit)
+    return translate_news.translate_items(items)
 
 
 def fetch_google_news(query, limit=3, lang="ko", country="KR"):
@@ -84,14 +87,14 @@ def fetch_ticker_news_via_yfinance(ticker, limit):
 
 def fetch_ticker_news(ticker, limit=2):
     """종목별 뉴스. 야후 파이낸스에서 먼저 찾아보고, 부족하면 구글 뉴스
-    검색으로 채움."""
+    검색으로 채움. 영어 제목은 한국어로 번역해요."""
     results = fetch_ticker_news_via_yfinance(ticker, limit)
-    if len(results) >= limit:
-        return results[:limit]
+    if len(results) < limit:
+        query = TICKER_SEARCH_NAMES.get(ticker, ticker)
+        fallback = fetch_google_news(query, limit - len(results))
+        results = results + fallback
 
-    query = TICKER_SEARCH_NAMES.get(ticker, ticker)
-    fallback = fetch_google_news(query, limit - len(results))
-    return results + fallback
+    return translate_news.translate_items(results[:limit])
 
 
 def fetch_all_ticker_news(tickers, limit=2):
